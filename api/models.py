@@ -11,6 +11,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
@@ -34,6 +35,11 @@ class Endpoint(Base):
     consecutive_failures: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_failure_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # First failure of the current outage; NULL when healthy. Recovery time
+    # (the EMA's input) is measured from here, never from last_failure_at.
+    failure_streak_started_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     health_score: Mapped[float] = mapped_column(Float, default=1.0, server_default="1.0")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -84,6 +90,12 @@ class DeliveryAttempt(Base):
     attempted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    # When the follow-up retry for this failed attempt is due. NULL on a
+    # non-final failed attempt means the worker died before scheduling the
+    # retry — the reaper uses this to find orphaned deliveries.
+    next_retry_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
     event: Mapped["Event"] = relationship(back_populates="delivery_attempts")
     endpoint: Mapped["Endpoint"] = relationship(back_populates="delivery_attempts")
@@ -91,6 +103,9 @@ class DeliveryAttempt(Base):
 
 class DeadLetter(Base):
     __tablename__ = "dead_letters"
+    __table_args__ = (
+        UniqueConstraint("event_id", "endpoint_id", name="uq_dead_letter_event_endpoint"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, server_default=func.gen_random_uuid()
