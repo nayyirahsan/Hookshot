@@ -14,7 +14,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.worker
-    command: celery -A worker.celery_app worker --loglevel=info --concurrency=4
+    command: celery -A worker.celery_app worker --beat --loglevel=info --concurrency=4
     environment:
       DATABASE_URL: postgresql+asyncpg://hookshot:hookshot@db:5432/hookshot
       REDIS_URL: redis://redis:6379/0

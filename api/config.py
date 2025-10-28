@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     max_delivery_attempts: int = 8
     http_timeout_seconds: float = 10.0
+    reaper_interval_seconds: int = 60
+    reaper_grace_seconds: int = 120
 
     @property
     def database_url_async(self) -> str:

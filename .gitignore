@@ -19,3 +19,7 @@ dashboard/dist/
 postgres_data/
 *.log
 .DS_Store
+
+# celery beat state
+celerybeat-schedule*
+dashboard/tsconfig.tsbuildinfo
