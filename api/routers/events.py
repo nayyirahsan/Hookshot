@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Response
-from sqlalchemy import select
+from sqlalchemy import any_, literal, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -52,7 +52,7 @@ async def ingest_event(
     endpoints_result = await db.execute(
         select(Endpoint).where(
             Endpoint.active.is_(True),
-            Endpoint.event_types.any(body.event_type),
+            literal(body.event_type) == any_(Endpoint.event_types),
         )
     )
     endpoints = list(endpoints_result.scalars().all())
