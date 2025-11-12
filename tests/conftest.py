@@ -63,16 +63,21 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     app.dependency_overrides.clear()
 
 
-@pytest.fixture(autouse=True)
-def truncate_sync_tables(request) -> Generator[None, None, None]:
-    if "client" not in request.fixturenames:
-        yield
-        return
-    yield
+def _truncate_all() -> None:
     with SyncSessionLocal() as session:
         for table in reversed(Base.metadata.sorted_tables):
             session.execute(text(f"TRUNCATE TABLE {table.name} RESTART IDENTITY CASCADE"))
         session.commit()
+
+
+@pytest.fixture(autouse=True)
+def clean_tables(request, setup_database) -> Generator[None, None, None]:
+    # Truncate BEFORE each test, not only after: a previous crashed run (or a
+    # dev server writing to the same DB) must not fail tests that assert on
+    # absolute row counts.
+    _truncate_all()
+    yield
+    _truncate_all()
 
 
 @pytest.fixture

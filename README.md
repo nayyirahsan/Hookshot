@@ -129,9 +129,12 @@ pip install -r requirements-dev.txt
 docker-compose up db redis -d
 alembic upgrade head
 uvicorn api.main:app --reload
-celery -A worker.celery_app worker --loglevel=info
-pytest tests/ -v
+celery -A worker.celery_app worker --beat --loglevel=info
+pytest tests/ -v          # 27 tests: delivery, idempotency, crash recovery, e2e vs real HTTP server
+ruff check . && mypy api/ worker/ --ignore-missing-imports
 ```
+
+The test suite covers: success, 5xx retry, timeout, connection refused, dead-lettering, manual DLQ retry, concurrent duplicate ingestion, and worker-crash recovery (orphaned events, mid-flight crashes, lost retries) — the crash tests reconstruct the exact DB state each crash leaves behind and assert the reaper re-drives delivery.
 
 ## Deployment (Render)
 
