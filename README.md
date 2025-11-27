@@ -77,38 +77,43 @@ Honest reading:
 - vs the **production-typical 30s-base** schedule: adaptive delivers **7× faster on fast endpoints** (4.3s vs 30.0s), 35% faster on medium, **27% lower fleet-wide mean latency**, at the cost of 2.6% of slow-class events dead-lettering (retryable from the DLQ).
 - The point: with a fixed attempt budget, a single global backoff must trade latency against coverage. Per-endpoint adaptation gets both.
 
-## Load Test Results
+## Load test (measured)
 
-Run against a running `docker-compose` stack:
+50,000 events fired by k6, split 50/30/20 across three local receivers with 100% / 90% / 50% response reliability. Single machine (M-series MacBook), one uvicorn process, one Celery worker (`--concurrency=8`), local Postgres + Redis. Two runs, both with zero ingestion failures:
 
-```bash
-k6 run load_test/hookshot.js
-```
+**Steady state — 250 events/s for 200s** (worker keeps up; latency = real delivery speed):
 
-**Target metrics:**
-- Ingestion p99 latency: < 500ms
-- Delivery success rate: 99.5%+
-- Mean delivery latency: document after run
+| Receiver class | events | delivered | mean delivery latency | p95 | attempts/event |
+|---|---|---|---|---|---|
+| 100% reliable | 25,001 | 100% | **3ms** | 4ms | 1.00 |
+| 90% reliable | 15,001 | 100% | 228ms | 2.1s | 1.11 |
+| 50% reliable | 10,000 | 99.73% | 1.95s | 7.5s | 1.98 |
+| **overall** | 50,002 | **99.95%** | 0.46s | — | 1.23 |
 
-**Sample run** (local docker-compose, reliable endpoint at httpbin):
+The 50%-class numbers validate the retry math: ~2 attempts per event as expected for p=0.5, and the 0.27% that dead-lettered are the events that failed the coin flip 8 times in a row (0.5⁸ ≈ 0.4%); all are retryable from the DLQ. Ingestion latency: median 2.3ms, p95 4.5ms.
+
+**Saturation burst — 500 events/s for 100s** (~1.3× the single worker's ~385 attempts/s delivery throughput):
 
 | Metric | Value |
-|--------|-------|
-| Ingestion p99 | ~45ms |
-| HTTP failure rate | < 0.01% |
-| Delivery success rate | 99.7% |
-| Mean delivery latency | ~180ms |
+|---|---|
+| Events accepted | 50,003 / 50,003, 0.00% HTTP failures |
+| Ingestion latency p50 / p95 / p99 | 2.9ms / 9.3ms / **59.7ms** |
+| Delivered after drain | 99.92% (flaky class 99.59%; DLQ ≈ 0.5⁸ as above) |
+| Queue fully drained | ~60s after the burst ended |
+
+Under saturation, delivery latency is dominated by queue wait (mean 10–19s during the burst) — ingestion stays fast and nothing is lost; the backlog drains and delivery completeness is unchanged. Delivery throughput scales with worker processes.
+
+Reproduce: setup steps are in the header of `load_test/hookshot.js`; steady-state run is `k6 run -e SCALE=0.5 -e DURATION=200s load_test/hookshot.js`, then `python -m load_test.report`.
 
 ## Quickstart
 
 ```bash
-# Start all services
 docker-compose up --build
 
 # Register an endpoint
 curl -X POST http://localhost:8000/api/endpoints \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://httpbin.org/post", "secret": "my-secret", "event_types": ["order.created"]}'
+  -d '{"url": "https://example.com/hooks", "secret": "my-secret", "event_types": ["order.created"]}'
 
 # Ingest an event
 curl -X POST http://localhost:8000/api/events \
@@ -117,11 +122,10 @@ curl -X POST http://localhost:8000/api/events \
   -d '{"event_type": "order.created", "data": {"order_id": "123", "amount": 99.99}}'
 
 # Dashboard
-cd dashboard && npm install && npm run dev
-# Open http://localhost:5173
+cd dashboard && npm install && npm run dev   # http://localhost:5173
 ```
 
-API docs: http://localhost:8000/docs
+API docs: http://localhost:8000/docs · Prometheus metrics: http://localhost:8000/metrics
 
 ## Receiving webhooks
 
