@@ -164,13 +164,14 @@ render deploy
 
 The `render.yaml` blueprint provisions a web service, background worker, and PostgreSQL database.
 
-## Project Structure
+## Project structure
 
 ```
-api/           FastAPI server
-worker/        Celery tasks + health model
+api/           FastAPI server (routers, models, schemas)
+worker/        Celery tasks, adaptive health model, reaper, HMAC signing
 migrations/    Alembic schema migrations
-tests/         Integration + unit tests
-dashboard/     React + TypeScript frontend
-load_test/     k6 load test script
+tests/         Integration + unit tests (incl. crash recovery, real-server e2e)
+experiments/   Reproducible adaptive-vs-fixed benchmark (+ results.json)
+load_test/     k6 script, scripted-reliability receivers, delivery report
+dashboard/     React + TypeScript ops dashboard
 ```

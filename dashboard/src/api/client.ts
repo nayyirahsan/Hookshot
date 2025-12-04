@@ -71,7 +71,13 @@ export interface PaginatedDeadLetters {
   page_size: number;
 }
 
+export interface Health {
+  status: string;
+  worker: string;
+}
+
 export const api = {
+  getHealth: () => request<Health>("/api/health"),
   getEndpoints: () => request<Endpoint[]>("/api/endpoints"),
   getEndpoint: (id: string) => request<Endpoint>(`/api/endpoints/${id}`),
   getDeliveries: (limit = 50) => request<Delivery[]>(`/api/deliveries?limit=${limit}`),

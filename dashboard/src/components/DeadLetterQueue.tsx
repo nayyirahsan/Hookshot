@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import type { DeadLetter } from "../api/client";
 import { api } from "../api/client";
+import { EmptyState, Panel, Timestamp } from "./ui";
 
 interface Props {
   deadLetters: DeadLetter[];
@@ -32,51 +34,64 @@ export default function DeadLetterQueue({ deadLetters, onRetry }: Props) {
 
   return (
     <div>
-      <div className="mb-4 flex justify-end">
+      <div className="mb-3 flex justify-end">
         <button
           onClick={handleRetryAll}
           disabled={deadLetters.length === 0 || loading === "all"}
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium hover:bg-indigo-500 disabled:opacity-50"
+          className="rounded border border-sky-500/40 bg-sky-500/10 px-4 py-1.5 font-mono text-xs font-medium text-sky-300 transition hover:bg-sky-500/20 disabled:opacity-40"
         >
-          {loading === "all" ? "Retrying…" : "Bulk Retry All"}
+          {loading === "all" ? "requeueing…" : `retry all (${deadLetters.length})`}
         </button>
       </div>
-      <div className="overflow-x-auto rounded-xl border border-slate-800">
+      <Panel className="overflow-x-auto">
         <table className="w-full text-left text-sm">
-          <thead className="bg-slate-900 text-slate-400">
-            <tr>
-              <th className="px-4 py-3">Event Type</th>
-              <th className="px-4 py-3">Endpoint</th>
-              <th className="px-4 py-3">Retries</th>
-              <th className="px-4 py-3">Last Error</th>
-              <th className="px-4 py-3">Created</th>
-              <th className="px-4 py-3"></th>
+          <thead>
+            <tr className="border-b border-hairline text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <th className="px-4 py-2.5">Event</th>
+              <th className="px-4 py-2.5">Endpoint</th>
+              <th className="px-4 py-2.5 text-right">Attempts</th>
+              <th className="px-4 py-2.5">Last error</th>
+              <th className="px-4 py-2.5 text-right">Dead-lettered</th>
+              <th className="px-4 py-2.5"></th>
             </tr>
           </thead>
           <tbody>
             {deadLetters.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
-                  No dead letters
+                <td colSpan={6}>
+                  <EmptyState title="Queue is empty — every delivery found its way" />
                 </td>
               </tr>
             ) : (
               deadLetters.map((dl) => (
-                <tr key={dl.id} className="border-t border-slate-800">
-                  <td className="px-4 py-3 font-mono">{dl.event_type ?? "—"}</td>
-                  <td className="px-4 py-3 font-mono text-xs">{dl.endpoint_url ?? "—"}</td>
-                  <td className="px-4 py-3">{dl.retry_count}</td>
-                  <td className="px-4 py-3 text-red-400">{dl.last_error ?? "—"}</td>
-                  <td className="px-4 py-3 text-slate-400">
-                    {new Date(dl.created_at).toLocaleString()}
+                <tr
+                  key={dl.id}
+                  className="row-in border-b border-hairline/50 last:border-0 hover:bg-slate-800/20"
+                >
+                  <td className="px-4 py-2.5 font-mono text-xs text-slate-300">
+                    {dl.event_type ?? "—"}
                   </td>
-                  <td className="px-4 py-3">
+                  <td className="max-w-[240px] truncate px-4 py-2.5 font-mono text-xs text-slate-400">
+                    <Link to={`/endpoints/${dl.endpoint_id}`} className="hover:text-sky-400">
+                      {dl.endpoint_url?.replace(/^https?:\/\//, "") ?? "—"}
+                    </Link>
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-mono text-xs text-slate-400">
+                    {dl.retry_count}
+                  </td>
+                  <td className="max-w-[260px] truncate px-4 py-2.5 font-mono text-xs text-red-400/90">
+                    {dl.last_error ?? "—"}
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
+                    <Timestamp iso={dl.created_at} />
+                  </td>
+                  <td className="px-4 py-2.5 text-right">
                     <button
                       onClick={() => handleRetry(dl.id)}
                       disabled={loading === dl.id}
-                      className="rounded bg-slate-700 px-3 py-1 text-xs hover:bg-slate-600 disabled:opacity-50"
+                      className="rounded border border-hairline px-3 py-1 font-mono text-[11px] text-slate-300 transition hover:border-sky-500/40 hover:text-sky-300 disabled:opacity-40"
                     >
-                      {loading === dl.id ? "…" : "Retry"}
+                      {loading === dl.id ? "…" : "retry"}
                     </button>
                   </td>
                 </tr>
@@ -84,7 +99,7 @@ export default function DeadLetterQueue({ deadLetters, onRetry }: Props) {
             )}
           </tbody>
         </table>
-      </div>
+      </Panel>
     </div>
   );
 }

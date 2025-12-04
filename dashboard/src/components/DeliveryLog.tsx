@@ -1,59 +1,61 @@
+import { Link } from "react-router-dom";
 import type { Delivery } from "../api/client";
+import { EmptyState, OutcomeBadge, Panel, Timestamp } from "./ui";
 
 interface Props {
   deliveries: Delivery[];
 }
 
-function statusLabel(outcome: string): string {
-  if (outcome === "success") return "success";
-  if (outcome === "failure" || outcome === "timeout" || outcome === "rejected") {
-    return outcome === "failure" ? "failed" : "retried";
-  }
-  return outcome;
-}
-
-function statusClass(outcome: string): string {
-  if (outcome === "success") return "text-emerald-400";
-  return "text-amber-400";
-}
-
 export default function DeliveryLog({ deliveries }: Props) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-slate-800">
+    <Panel className="overflow-x-auto">
       <table className="w-full text-left text-sm">
-        <thead className="bg-slate-900 text-slate-400">
-          <tr>
-            <th className="px-4 py-3">Event Type</th>
-            <th className="px-4 py-3">Endpoint</th>
-            <th className="px-4 py-3">Status</th>
-            <th className="px-4 py-3">Latency</th>
-            <th className="px-4 py-3">Attempted At</th>
+        <thead>
+          <tr className="border-b border-hairline text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+            <th className="px-4 py-2.5">Event</th>
+            <th className="px-4 py-2.5">Endpoint</th>
+            <th className="px-4 py-2.5">Attempt</th>
+            <th className="px-4 py-2.5">Outcome</th>
+            <th className="px-4 py-2.5 text-right">Latency</th>
+            <th className="px-4 py-2.5 text-right">When</th>
           </tr>
         </thead>
         <tbody>
           {deliveries.length === 0 ? (
             <tr>
-              <td colSpan={5} className="px-4 py-6 text-center text-slate-500">
-                No deliveries yet
+              <td colSpan={6}>
+                <EmptyState title="No deliveries yet — ingest an event to see the feed" />
               </td>
             </tr>
           ) : (
             deliveries.map((d) => (
-              <tr key={d.id} className="border-t border-slate-800">
-                <td className="px-4 py-3 font-mono">{d.event_type}</td>
-                <td className="px-4 py-3 font-mono text-xs">{d.endpoint_url}</td>
-                <td className={`px-4 py-3 ${statusClass(d.outcome)}`}>
-                  {statusLabel(d.outcome)}
+              <tr
+                key={d.id}
+                className="row-in border-b border-hairline/50 last:border-0 hover:bg-slate-800/20"
+              >
+                <td className="px-4 py-2.5 font-mono text-xs text-slate-300">{d.event_type}</td>
+                <td className="max-w-[220px] truncate px-4 py-2.5 font-mono text-xs text-slate-400">
+                  <Link to={`/endpoints/${d.endpoint_id}`} className="hover:text-sky-400">
+                    {d.endpoint_url.replace(/^https?:\/\//, "")}
+                  </Link>
                 </td>
-                <td className="px-4 py-3">{d.latency_ms ?? "—"} ms</td>
-                <td className="px-4 py-3 text-slate-400">
-                  {new Date(d.attempted_at).toLocaleString()}
+                <td className="px-4 py-2.5 font-mono text-xs text-slate-500">
+                  #{d.attempt_number}
+                </td>
+                <td className="px-4 py-2.5">
+                  <OutcomeBadge outcome={d.outcome} statusCode={d.status_code} />
+                </td>
+                <td className="px-4 py-2.5 text-right font-mono text-xs text-slate-400">
+                  {d.latency_ms != null ? `${d.latency_ms} ms` : "—"}
+                </td>
+                <td className="px-4 py-2.5 text-right">
+                  <Timestamp iso={d.attempted_at} />
                 </td>
               </tr>
             ))
           )}
         </tbody>
       </table>
-    </div>
+    </Panel>
   );
 }
