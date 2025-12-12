@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 
 from alembic import command
@@ -10,6 +11,7 @@ from api.config import get_settings
 from api.routers import dead_letters, deliveries, endpoints, events, health
 
 settings = get_settings()
+logger = logging.getLogger("hookshot.startup")
 
 
 def run_migrations() -> None:
@@ -19,10 +21,18 @@ def run_migrations() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    run_migrations()
-    redis = Redis.from_url(settings.redis_url)
-    redis.ping()
-    redis.close()
+    try:
+        run_migrations()
+    except Exception:
+        logger.exception("Alembic migration failed during startup")
+        raise
+    try:
+        redis = Redis.from_url(settings.redis_url)
+        redis.ping()
+        redis.close()
+    except Exception:
+        logger.exception("Redis connectivity check failed during startup")
+        raise
     yield
 
 
@@ -30,7 +40,7 @@ app = FastAPI(title="Hookshot", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174"],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

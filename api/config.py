@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     http_timeout_seconds: float = 10.0
     reaper_interval_seconds: int = 60
     reaper_grace_seconds: int = 120
+    cors_origins: str = "http://localhost:5173,http://localhost:5174"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
     @property
     def database_url_async(self) -> str:
