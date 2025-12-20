@@ -4,6 +4,8 @@ An adaptive webhook delivery engine. Instead of one global retry schedule, Hooks
 
 **Stack:** FastAPI · Celery · Redis · PostgreSQL · React + TypeScript · Docker Compose · Render
 
+**Live demo:** [dashboard](https://hookshot-dashboard.vercel.app) (Vercel) · [API](https://hookshot-api.onrender.com) (Render). This hosted instance runs the API and dashboard only — Render's free plan doesn't support background worker services, so the Celery worker that actually executes deliveries and adaptive retries isn't running there. The dashboard UI is browsable, but the delivery log, health scores, and dead-letter queue will stay empty since nothing is being delivered. Run `docker-compose up` locally (see Quickstart) to see the full pipeline — worker included — in action.
+
 ## Architecture
 
 ```mermaid
@@ -155,14 +157,11 @@ ruff check . && mypy api/ worker/ --ignore-missing-imports
 
 The test suite covers: success, 5xx retry, timeout, connection refused, dead-lettering, manual DLQ retry, concurrent duplicate ingestion, and worker-crash recovery (orphaned events, mid-flight crashes, lost retries) — the crash tests reconstruct the exact DB state each crash leaves behind and assert the reaper re-drives delivery.
 
-## Deployment (Render)
+## Deployment (Render + Vercel)
 
-```bash
-# Set REDIS_URL to a Render Key Value or Upstash instance
-render deploy
-```
+`render.yaml` provisions the API web service and PostgreSQL; set `REDIS_URL` to a Render Key Value or Upstash instance (use `rediss://` — Upstash requires TLS). The dashboard deploys separately to Vercel with `VITE_API_BASE` pointed at the Render API URL, and the API's `CORS_ORIGINS` env var needs the Vercel domain added.
 
-The `render.yaml` blueprint provisions a web service, background worker, and PostgreSQL database.
+`render.yaml` also declares a `hookshot-worker` background worker, but Render's free plan only supports Web Services, Postgres, and Key Value — background workers require a paid plan. The worker won't deploy on a free-tier Blueprint; run it via `docker-compose up worker` (or upgrade the Render service to Starter) to get live deliveries.
 
 ## Project structure
 
